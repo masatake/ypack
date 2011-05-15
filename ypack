@@ -71,7 +71,7 @@
   (define (emit-xpack-relations)
     (let1 requires (apply string-append (intersperse "," requires))
       (print #`"	--requires ,|requires| \\")))
-  (define (emit-pmacker-relations)
+  (define (emit-pmaker-relations)
     (let1 requires (apply string-append (intersperse "," requires))
       (print #`"	--relations=requires:,|requires| \\")))
   (unless name
@@ -92,7 +92,7 @@
   
   (case target
     ('xpack (emit-xpack-relations))
-    ('pmacker (emit-pmacker-relations)))
+    ('pmaker (emit-pmaker-relations)))
 
   (print " - <<EOF")
   (for-each (lambda (entry)
@@ -112,6 +112,6 @@
   (let-args (cdr args)
       ((help "h|help" => (pa$ print-help 0))
        (xpack "xpack" #f)
-       (pmacker "pmacker" #t))
-    (let1 target (if xpack 'xpack 'pmacker)
+       (pmaker "pmaker" #t))
+    (let1 target (if xpack 'xpack 'pmaker)
       (call-with-values gather (pa$ emit target)))))
