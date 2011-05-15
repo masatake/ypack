@@ -1,0 +1,4 @@
+ypack takes es expressions(http://droite.sourceforge.net/) from stdin
+and emits a command line to invoke pmaker. pmaker is in
+rpmkit(https://github.com/ssato/rpmkit).
+

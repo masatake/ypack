@@ -1,0 +1,117 @@
+#!/bin/sh
+#| -*- scheme -*- |#
+:; exec gosh -- $0 "$@"
+;; 
+;; ypack --- es expression front end for pmaker, that was xpack
+;; 
+;;  Copyright (C) 2011 Masatake YAMATO
+;; 
+;;  This program is free software: you can redistribute it and/or modify
+;;  it under the terms of the GNU General Public License as published by
+;;  the Free Software Foundation; either version 3 of the License, or
+;;  (at your option) any later version.
+;; 
+;;  This program is distributed in the hope that it will be useful,
+;;  but WITHOUT ANY WARRANTY; without even the implied warranty of
+;;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;;  GNU General Public License for more details.
+;; 
+;;  You should have received a copy of the GNU General Public License
+;;  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+;; 
+;;  Author: Masatake YAMATO <yamato@redhat.com>
+;;
+
+;; INPUT: 
+;;
+;;  (ypack-name "...")
+;;  (ypack-version "...")
+;;  (ypack-require "...")...
+;;  (ypack-entry FROM TO MODE ...)...
+;;
+(use util.match)
+(use file.util)
+(use util.list)
+(use gauche.parseopt)
+
+(define-class <file-info> ()
+  ((from :init-keyword :from)
+   (to :init-keyword :to)
+   (mode :init-keyword :mode)))
+
+(define (gather)
+  (let loop ((exp (read))
+	     (name #f)
+	     (version "0.0.0")
+	     (entries (list))
+	     (requires (list)))
+    (if (eof-object? exp)
+	(values version name entries requires)
+	(case (car exp)
+	  ('ypack-version (loop (read) name (cadr exp) entries requires))
+	  ('ypack-entry (match-let1 (from to . rest) (cdr exp)
+				    (unless (file-exists? from)
+				      (error "No such file: " from))
+				    (let-keywords rest ((mode "a+rx"))
+				      (loop (read)
+					    name
+					    version
+					    (cons (make <file-info>
+						    :from from 
+						    :to to
+						    :mode mode)
+						  entries)
+					    requires))))
+	  ('ypack-name (loop (read) (cadr exp) version entries requires))
+	  ('ypack-require (loop (read) name version entries (cons (cadr exp) requires)))
+	  (else
+	   (error "Unknown directive: " (car exp)))))))
+
+(define (emit target version name entries requires)
+  (define (emit-xpack-relations)
+    (let1 requires (apply string-append (intersperse "," requires))
+      (print #`"	--requires ,|requires| \\")))
+  (define (emit-pmacker-relations)
+    (let1 requires (apply string-append (intersperse "," requires))
+      (print #`"	--relations=requires:,|requires| \\")))
+  (unless name
+    (error "No NAME given"))
+
+  ;;
+  (print "#!/bin/bash -x")
+  (print "rm -rf workdir build")
+  (for-each 
+   (lambda (entry)
+     (print #`"install -D --mode=,(ref entry 'mode) ,(ref entry 'from) build,(ref entry 'to)\n"))
+   entries)
+
+  (print #`",(symbol->string target) --name ,|name|	\\")
+  (print #`"	--destdir=$(pwd)/build \\")
+  (print "	--ignore-owner \\")
+  (print #`"	--pversion=,|version|  \\")
+  
+  (case target
+    ('xpack (emit-xpack-relations))
+    ('pmacker (emit-pmacker-relations)))
+
+  (print " - <<EOF")
+  (for-each (lambda (entry)
+	      (print #`"$(pwd)/build,(ref entry 'to)"))
+	    entries)
+  (print "EOF"))
+    
+   
+
+(define (print-help status)
+  (format #t "Usage: \n")
+  (format #t "	~a --xpack  < _.ypk\n" *program-name*)
+  (format #t "	~a --pmaker < _.ypk\n" *program-name*)
+  (exit status))
+
+(define (main args)
+  (let-args (cdr args)
+      ((help "h|help" => (pa$ print-help 0))
+       (xpack "xpack" #f)
+       (pmacker "pmacker" #t))
+    (let1 target (if xpack 'xpack 'pmacker)
+      (call-with-values gather (pa$ emit target)))))
