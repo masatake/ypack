@@ -69,11 +69,13 @@
 
 (define (emit target version name entries requires)
   (define (emit-xpack-relations)
-    (let1 requires (apply string-append (intersperse "," requires))
-      (print #`"	--requires ,|requires| \\")))
+    (unless (null? requires)
+      (let1 requires (apply string-append (intersperse "," requires))
+      (print #`"	--requires ,|requires| \\"))))
   (define (emit-pmaker-relations)
-    (let1 requires (apply string-append (intersperse "," requires))
-      (print #`"	--relations=requires:,|requires| \\")))
+    (unless (null? requires)
+      (let1 requires (apply string-append (intersperse "," requires))
+	(print #`"	--relations=requires:,|requires| \\"))))
   (unless name
     (error "No NAME given"))
 

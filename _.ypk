@@ -1,4 +1,4 @@
-(ypack-version "0.0.3")
+(ypack-version "0.0.4")
 (ypack-require "gauche")
 (ypack-name "ypack")
 (ypack-entry "ypack" "/usr/bin/ypack")
