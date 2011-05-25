@@ -46,7 +46,7 @@
 	     (entries (list))
 	     (requires (list)))
     (if (eof-object? exp)
-	(values version name entries requires)
+	(values version name (reverse entries) requires)
 	(case (car exp)
 	  ('ypack-version (loop (read) name (cadr exp) entries requires))
 	  ('ypack-entry (match-let1 (from to . rest) (cdr exp)
