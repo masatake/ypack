@@ -82,7 +82,9 @@
   (print "rm -rf workdir build")
   (for-each 
    (lambda (entry)
-     (print #`"install -D --mode=,(ref entry 'mode) ,(ref entry 'from) build,(ref entry 'to)\n"))
+     (let1 dir-flag (if (file-is-directory? (ref entry 'from))
+			"-d" "")
+       (print #`"install ,dir-flag -D --mode=,(ref entry 'mode) ,(ref entry 'from) build,(ref entry 'to)\n")))
    entries)
 
   (print #`",(symbol->string target) --name ,|name|	\\")
