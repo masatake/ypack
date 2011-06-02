@@ -28,6 +28,7 @@
 ;;  (ypack-version "...")
 ;;  (ypack-require "...")...
 ;;  (ypack-entry FROM TO MODE ...)...
+;;  (ypack-link  FROM TO)
 ;;
 (use util.match)
 (use file.util)
@@ -37,7 +38,8 @@
 (define-class <file-info> ()
   ((from :init-keyword :from)
    (to :init-keyword :to)
-   (mode :init-keyword :mode)))
+   (mode :init-keyword :mode)
+   (link? :init-value #f :init-keyword :link?)))
 
 (define (gather)
   (let loop ((exp (read))
@@ -62,6 +64,16 @@
 						    :mode mode)
 						  entries)
 					    requires))))
+	  ('ypack-link (match-let1 (from to . rest) (cdr exp)
+			 (loop (read)
+				 name
+				 version
+				 (cons (make <file-info>
+					 :from from 
+					 :to to
+					 :link? #t)
+				       entries)
+				 requires)))
 	  ('ypack-name (loop (read) (cadr exp) version entries requires))
 	  ('ypack-require (loop (read) name version entries (cons (cadr exp) requires)))
 	  (else
@@ -84,9 +96,15 @@
   (print "rm -rf workdir build")
   (for-each 
    (lambda (entry)
-     (let1 dir-flag (if (file-is-directory? (ref entry 'from))
-			"-d" "")
-       (print #`"install ,dir-flag -D --mode=,(ref entry 'mode) ,(ref entry 'from) build,(ref entry 'to)\n")))
+     (if (ref entry 'link?)
+	 (let ((dir (sys-dirname (ref entry 'from)))
+	       (link (sys-basename (ref entry 'from))))
+	   (print #`"mkdir -p build,|dir|")
+	   (print #`"ln -s ,(ref entry 'to) build,(ref entry 'from)")
+	   )
+	 (let1 dir-flag (if (file-is-directory? (ref entry 'from))
+			    "-d" "")
+	   (print #`"install ,dir-flag -D --mode=,(ref entry 'mode) ,(ref entry 'from) build,(ref entry 'to)\n"))))
    entries)
 
   (print #`",(symbol->string target) --name ,|name|	\\")
@@ -100,7 +118,9 @@
 
   (print " - <<EOF")
   (for-each (lambda (entry)
-	      (print #`"$(pwd)/build,(ref entry 'to)"))
+	      (if (ref entry 'link?)
+		  (print #`"$(pwd)/build,(ref entry 'from)")
+		  (print #`"$(pwd)/build,(ref entry 'to)")))
 	    entries)
   (print "EOF"))
     
