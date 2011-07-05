@@ -107,7 +107,7 @@
 	   (print #`"install ,dir-flag -D --mode=,(ref entry 'mode) ,(ref entry 'from) build,(ref entry 'to)\n"))))
    entries)
 
-  (print #`",(symbol->string target) --name ,|name|	\\")
+  (print #`",(symbol->string target) --verbose --name ,|name|	\\")
   (print #`"	--destdir=$(pwd)/build \\")
   (print "	--ignore-owner \\")
   (print #`"	--pversion=,|version|  \\")
