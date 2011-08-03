@@ -93,6 +93,8 @@
 
   ;;
   (print "#!/bin/bash -x")
+  (print "uv=${1:-0}")
+  (newline)
   (print "rm -rf workdir build")
   (for-each 
    (lambda (entry)
@@ -110,7 +112,7 @@
   (print #`",(symbol->string target) --verbose --name ,|name|	\\")
   (print #`"	--destdir=$(pwd)/build \\")
   (print "	--ignore-owner \\")
-  (print #`"	--pversion=,|version|  \\")
+  (print #`"	--pversion=,|version|.${uv} \\")
   
   (case target
     ('xpack (emit-xpack-relations))
