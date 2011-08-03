@@ -54,7 +54,7 @@
 	  ('ypack-entry (match-let1 (from to . rest) (cdr exp)
 				    (unless (file-exists? from)
 				      (error "No such file: " from))
-				    (let-keywords rest ((mode "a+rx"))
+				    (let-keywords rest ((mode "u+w,a+rx"))
 				      (loop (read)
 					    name
 					    version
