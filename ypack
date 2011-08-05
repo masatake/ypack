@@ -30,6 +30,7 @@
 ;;  (ypack-entry FROM TO MODE ...)...
 ;;  (ypack-link  FROM TO)
 ;;  (ypack-dir   TO)
+;;  (ypack-dummy TO)
 ;;
 (use util.match)
 (use file.util)
@@ -40,18 +41,56 @@
   ((from :init-keyword :from)
    (to :init-keyword :to)
    (mode :init-keyword :mode)
-   (type :init-value 'regular :init-keyword :type)))
+   ))
+
+(define-class <regular-info> (<file-info>)
+  ())
+(define-class <dir-info> (<file-info>)
+  ())
+(define-class <link-info> (<file-info>)
+  ())
+(define-class <dummy-info> (<file-info>)
+  ((dummy-count :init-keyword :dummy-count)
+   ))
+
+(define-method prepare ((entry <regular-info>))
+  (let1 dir-flag (if (file-is-directory? (ref entry 'from))
+		     "-d" "")
+    (print #`"install ,dir-flag -D --mode=,(ref entry 'mode) ,(ref entry 'from) build,(ref entry 'to)")))
+(define-method prepare ((entry <dir-info>))
+  (let1 dir (ref entry 'to)
+    (print #`"mkdir -p build,|dir|")))
+(define-method prepare ((entry <link-info>))
+  (let ((dir (sys-dirname (ref entry 'from)))
+	(link (sys-basename (ref entry 'from))))
+    (print #`"mkdir -p build,|dir|")
+    (print #`"ln -s ,(ref entry 'to) build,(ref entry 'from)")))
+(define-method prepare ((entry <dummy-info>))
+  (let1 to (ref entry 'to)
+    (print #`"echo ,(ref entry 'dummy-count) > build,|to|")
+    (print #`"chmod ,(ref entry 'mode) build,|to|")))
+
+(define-method emit-file-list-entry ((entry <regular-info>))
+  (print #`"$(pwd)/build,(ref entry 'to)"))
+(define-method emit-file-list-entry ((entry <dir-info>))
+  (print #`"$(pwd)/build,(ref entry 'to)"))
+(define-method emit-file-list-entry ((entry <link-info>))
+  (print #`"$(pwd)/build,(ref entry 'from)"))
+(define-method emit-file-list-entry ((entry <dummy-info>))
+  (print #`"$(pwd)/build,(ref entry 'to)"))
+
 
 (define (gather)
   (let loop ((exp (read))
 	     (name #f)
 	     (version "0.0.0")
 	     (entries (list))
-	     (requires (list)))
+	     (requires (list))
+	     (dummy-count 0))
     (if (eof-object? exp)
 	(values version name (reverse entries) requires)
 	(case (car exp)
-	  ('ypack-version (loop (read) name (cadr exp) entries requires))
+	  ('ypack-version (loop (read) name (cadr exp) entries requires dummy-count))
 	  ('ypack-entry (match-let1 (from to . rest) (cdr exp)
 				    (unless (file-exists? from)
 				      (error "No such file: " from))
@@ -59,35 +98,59 @@
 				      (loop (read)
 					    name
 					    version
-					    (cons (make <file-info>
+					    (cons (make <regular-info>
 						    :from from 
 						    :to to
 						    :mode mode)
 						  entries)
-					    requires))))
+					    requires
+					    dummy-count))))
 	  ('ypack-dir (match-let1 (to . rest) (cdr exp)
 			(loop (read)
-				 name
-				 version
-				 (cons (make <file-info>
-					 :from #f
-					 :to to
-					 :type 'dir)
-				       entries)
-				 requires)
+			      name
+			      version
+			      (cons (make <dir-info>
+				      :from #f
+				      :to to)
+				    entries)
+			      requires
+			      dummy-count)
 			))
 	  ('ypack-link (match-let1 (from to . rest) (cdr exp)
 			 (loop (read)
-				 name
-				 version
-				 (cons (make <file-info>
-					 :from from 
-					 :to to
-					 :type 'link)
-				       entries)
-				 requires)))
-	  ('ypack-name (loop (read) (cadr exp) version entries requires))
-	  ('ypack-require (loop (read) name version entries (cons (cadr exp) requires)))
+			       name
+			       version
+			       (cons (make <link-info>
+				       :from from 
+				       :to to)
+				     entries)
+			       requires
+			       dummy-count)))
+	  ('ypack-dummy (match-let1 (to . rest) (cdr exp)
+			  (let-keywords rest ((mode "u+w,a+rx"))
+			    (loop (read)
+				  name
+				  version
+				  (cons (make <dummy-info>
+					  :from #f
+					  :to to
+					  :mode mode
+					  :dummy-count dummy-count)
+					entries)
+				  requires
+				  (+ dummy-count 1)))))
+	  ('ypack-name (loop (read)
+			     (cadr exp)
+			     version
+			     entries
+			     requires
+			     dummy-count))
+	  ('ypack-require (loop (read) 
+				name
+				version
+				entries
+				(cons (cadr exp) requires)
+				dummy-count))
 	  (else
 	   (error "Unknown directive: " (car exp)))))))
 
@@ -108,24 +171,7 @@
   (print "uv=${1:-0}")
   (newline)
   (print "rm -rf workdir build")
-  (for-each 
-   (lambda (entry)
-     (case (ref entry 'type)
-       ('link
-	(let ((dir (sys-dirname (ref entry 'from)))
-	      (link (sys-basename (ref entry 'from))))
-	  (print #`"mkdir -p build,|dir|")
-	  (print #`"ln -s ,(ref entry 'to) build,(ref entry 'from)")
-	  ))
-       ('dir
-	(let1 dir (ref entry 'to)
-	  (print #`"mkdir -p build,|dir|")
-	  ))
-       ('regular
-	(let1 dir-flag (if (file-is-directory? (ref entry 'from))
-			   "-d" "")
-	  (print #`"install ,dir-flag -D --mode=,(ref entry 'mode) ,(ref entry 'from) build,(ref entry 'to)")))))
-   entries)
+  (for-each prepare entries)
 
   (print #`",(symbol->string target) --verbose --name ,|name|	\\")
   (print #`"	--destdir=$(pwd)/build \\")
@@ -137,15 +183,7 @@
     ('pmaker (emit-pmaker-relations)))
 
   (print " - <<EOF")
-  (for-each (lambda (entry)
-	      (case (ref entry 'type)
-		('link
-		 (print #`"$(pwd)/build,(ref entry 'from)"))
-		('dir
-		 (print #`"$(pwd)/build,(ref entry 'to)"))
-		('regular
-		 (print #`"$(pwd)/build,(ref entry 'to)"))))
-	    entries)
+  (for-each emit-file-list-entry entries)
   (print "EOF"))
 
 
