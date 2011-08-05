@@ -29,6 +29,7 @@
 ;;  (ypack-require "...")...
 ;;  (ypack-entry FROM TO MODE ...)...
 ;;  (ypack-link  FROM TO)
+;;  (ypack-dir   TO)
 ;;
 (use util.match)
 (use file.util)
@@ -39,7 +40,7 @@
   ((from :init-keyword :from)
    (to :init-keyword :to)
    (mode :init-keyword :mode)
-   (link? :init-value #f :init-keyword :link?)))
+   (type :init-value 'regular :init-keyword :type)))
 
 (define (gather)
   (let loop ((exp (read))
@@ -64,6 +65,17 @@
 						    :mode mode)
 						  entries)
 					    requires))))
+	  ('ypack-dir (match-let1 (to . rest) (cdr exp)
+			(loop (read)
+				 name
+				 version
+				 (cons (make <file-info>
+					 :from #f
+					 :to to
+					 :type 'dir)
+				       entries)
+				 requires)
+			))
 	  ('ypack-link (match-let1 (from to . rest) (cdr exp)
 			 (loop (read)
 				 name
@@ -71,7 +83,7 @@
 				 (cons (make <file-info>
 					 :from from 
 					 :to to
-					 :link? #t)
+					 :type 'link)
 				       entries)
 				 requires)))
 	  ('ypack-name (loop (read) (cadr exp) version entries requires))
@@ -83,7 +95,7 @@
   (define (emit-xpack-relations)
     (unless (null? requires)
       (let1 requires (apply string-append (intersperse "," requires))
-      (print #`"	--requires ,|requires| \\"))))
+	(print #`"	--requires ,|requires| \\"))))
   (define (emit-pmaker-relations)
     (unless (null? requires)
       (let1 requires (apply string-append (intersperse "," requires))
@@ -96,15 +108,21 @@
   (print "rm -rf workdir build")
   (for-each 
    (lambda (entry)
-     (if (ref entry 'link?)
-	 (let ((dir (sys-dirname (ref entry 'from)))
-	       (link (sys-basename (ref entry 'from))))
-	   (print #`"mkdir -p build,|dir|")
-	   (print #`"ln -s ,(ref entry 'to) build,(ref entry 'from)")
-	   )
-	 (let1 dir-flag (if (file-is-directory? (ref entry 'from))
-			    "-d" "")
-	   (print #`"install ,dir-flag -D --mode=,(ref entry 'mode) ,(ref entry 'from) build,(ref entry 'to)\n"))))
+     (case (ref entry 'type)
+       ('link
+	(let ((dir (sys-dirname (ref entry 'from)))
+	      (link (sys-basename (ref entry 'from))))
+	  (print #`"mkdir -p build,|dir|")
+	  (print #`"ln -s ,(ref entry 'to) build,(ref entry 'from)")
+	  ))
+       ('dir
+	(let1 dir (ref entry 'to)
+	  (print #`"mkdir -p build,|dir|")
+	  ))
+       ('regular
+	(let1 dir-flag (if (file-is-directory? (ref entry 'from))
+			   "-d" "")
+	  (print #`"install ,dir-flag -D --mode=,(ref entry 'mode) ,(ref entry 'from) build,(ref entry 'to)")))))
    entries)
 
   (print #`",(symbol->string target) --verbose --name ,|name|	\\")
@@ -118,13 +136,17 @@
 
   (print " - <<EOF")
   (for-each (lambda (entry)
-	      (if (ref entry 'link?)
-		  (print #`"$(pwd)/build,(ref entry 'from)")
-		  (print #`"$(pwd)/build,(ref entry 'to)")))
+	      (case (ref entry 'type)
+		('link
+		 (print #`"$(pwd)/build,(ref entry 'from)"))
+		('dir
+		 (print #`"$(pwd)/build,(ref entry 'to)"))
+		('regular
+		 (print #`"$(pwd)/build,(ref entry 'to)"))))
 	    entries)
   (print "EOF"))
-    
-   
+
+
 
 (define (print-help status)
   (format #t "Usage: \n")
