@@ -37,21 +37,32 @@
 (use util.list)
 (use gauche.parseopt)
 
-(define-class <file-info> ()
+(define-class <entry-info> ()
   ((from :init-keyword :from)
    (to :init-keyword :to)
    (mode :init-keyword :mode)
+   (uid :init-keyword :uid)
+   (gid :init-keyword :gid)
    ))
 
-(define-class <regular-info> (<file-info>)
+(define-class <regular-info> (<entry-info>)
   ())
-(define-class <dir-info> (<file-info>)
+(define-class <dir-info> (<entry-info>)
   ())
-(define-class <link-info> (<file-info>)
+(define-class <link-info> (<entry-info>)
   ())
-(define-class <dummy-info> (<file-info>)
+(define-class <dummy-info> (<entry-info>)
   ((dummy-count :init-keyword :dummy-count)
    ))
+
+(define-method emit-attrs ((entry <entry-info>))
+  (apply string-append
+	 (list (if-let1 r (ref entry 'uid) 
+			#`",,uid=,r"
+			"")
+	       (if-let1 r (ref entry 'gid) 
+			#`",,gid=,r"
+			""))))
 
 (define-method prepare ((entry <regular-info>))
   (let1 dir-flag (if (file-is-directory? (ref entry 'from))
@@ -71,13 +82,13 @@
     (print #`"chmod ,(ref entry 'mode) build,|to|")))
 
 (define-method emit-file-list-entry ((entry <regular-info>))
-  (print #`"$(pwd)/build,(ref entry 'to)"))
+  (print #`"$(pwd)/build,(ref entry 'to),(emit-attrs entry)"))
 (define-method emit-file-list-entry ((entry <dir-info>))
-  (print #`"$(pwd)/build,(ref entry 'to)"))
+  (print #`"$(pwd)/build,(ref entry 'to),(emit-attrs entry)"))
 (define-method emit-file-list-entry ((entry <link-info>))
-  (print #`"$(pwd)/build,(ref entry 'from)"))
+  (print #`"$(pwd)/build,(ref entry 'from),(emit-attrs entry)"))
 (define-method emit-file-list-entry ((entry <dummy-info>))
-  (print #`"$(pwd)/build,(ref entry 'to)"))
+  (print #`"$(pwd)/build,(ref entry 'to),(emit-attrs entry)"))
 
 
 (define (gather)
@@ -94,7 +105,9 @@
 	  ('ypack-entry (match-let1 (from to . rest) (cdr exp)
 				    (unless (file-exists? from)
 				      (error "No such file: " from))
-				    (let-keywords rest ((mode "u+w,a+rx"))
+				    (let-keywords rest ((mode "u+w,a+rx")
+							(uid #f)
+							(gid #f))
 				      (loop (read)
 					    name
 					    version
@@ -106,16 +119,21 @@
 					    requires
 					    dummy-count))))
 	  ('ypack-dir (match-let1 (to . rest) (cdr exp)
-			(loop (read)
-			      name
-			      version
-			      (cons (make <dir-info>
-				      :from #f
-				      :to to)
-				    entries)
-			      requires
-			      dummy-count)
-			))
+				  (let-keywords rest ((mode "u+w,a+rx")
+						      (uid #f)
+						      (gid #f))
+						(loop (read)
+						      name
+						      version
+						      (cons (make <dir-info>
+							      :from #f
+							      :to to
+							      :mode mode
+							      :uid uid
+							      :gid gid)
+							    entries)
+						      requires
+						      dummy-count))))
 	  ('ypack-link (match-let1 (from to . rest) (cdr exp)
 			 (loop (read)
 			       name
@@ -127,7 +145,9 @@
 			       requires
 			       dummy-count)))
 	  ('ypack-dummy (match-let1 (to . rest) (cdr exp)
-			  (let-keywords rest ((mode "u+w,a+rx"))
+			  (let-keywords rest ((mode "u+w,a+rx")
+					      (uid #f)
+					      (gid #f))
 			    (loop (read)
 				  name
 				  version
@@ -135,7 +155,9 @@
 					  :from #f
 					  :to to
 					  :mode mode
-					  :dummy-count dummy-count)
+					  :dummy-count dummy-count
+					  :uid uid
+					  :gid gid)
 					entries)
 				  requires
 				  (+ dummy-count 1)))))
