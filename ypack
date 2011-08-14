@@ -32,6 +32,7 @@
 ;;  (ypack-dir   TO)
 ;;  (ypack-dummy TO)
 ;;
+(use srfi-1)
 (use util.match)
 (use file.util)
 (use util.list)
@@ -43,26 +44,98 @@
    (mode :init-keyword :mode)
    (uid :init-keyword :uid)
    (gid :init-keyword :gid)
+   (create-as)
    ))
 
 (define-class <regular-info> (<entry-info>)
-  ())
+  (
+   (create-as :init-value "file")
+   ))
 (define-class <dir-info> (<entry-info>)
-  ())
+  (
+   (create-as :init-value "dir")
+   ))
 (define-class <link-info> (<entry-info>)
-  ())
+  (
+   (create-as :init-value "symlink")
+   ))
 (define-class <dummy-info> (<entry-info>)
-  ((dummy-count :init-keyword :dummy-count)
+  (
+   (create-as :init-value "file")
+   (dummy-count :init-keyword :dummy-count)
    ))
 
+
+(define (mode-symbols->numbers msyms)
+  (define (xa left)
+    (fold (lambda (c kdr) (if (eq? c #\a) 
+			      (lset-union eq? '(#\u #\g #\o) kdr)
+			      (lset-adjoin eq? kdr c)))
+	  (list) (string->list left)))
+  (define (l->shift l)
+    (or (assoc-ref '((#\u . 6)
+		     (#\g . 3)
+		     (#\o . 0))
+		   l #f)
+	(error "Unknow left value: " l)))
+  (define (r->bits r)
+    (assoc-ref '((#\x . #b00000000001)
+		 (#\w . #b00000000010)
+		 (#\r . #b00000000100)
+		 (#\t . #b01000000000)
+		 (#\s . #b10000000000))
+	       r #f))
+
+  (define (lr->m left right)
+    (apply logior
+	   0
+	   (append-map
+	    (lambda (l)
+	      (map
+	       (lambda (r)
+		 (case r
+		   ((#\x #\w #\r) (ash (r->bits r) (l->shift l)))
+		   ('#\t (r->bits r))
+		   ('#\s (ash (r->bits r)
+			      (if (eq? l #\u) 1 0)))
+		   (else
+		    (error "Unknow right value: " r))))
+	       (string->list right)))
+	    (xa left))))
+  (let loop ((msyms (string-split msyms ","))
+	     (m #o0))
+    (if (null? msyms)
+	m
+	(rxmatch-if (#/([^+-=]+)([+-=])([^+-=]+)/ (car msyms))
+		    (#f left op right)
+		    (loop (cdr msyms)
+			  (case (car (string->list op))
+			    ;('#\= (lr->m left right))
+			    ('#\- (logand m (lognot (lr->m left right))))
+			    ('#\+ (logior m (lr->m left right)))
+			    (else
+			     (error "Unknow operator: " op))))
+		    (error "Failed in parse mode string")))))
+
 (define-method emit-attrs ((entry <entry-info>))
-  (apply string-append
-	 (list (if-let1 r (ref entry 'uid) 
-			#`",,uid=,r"
-			"")
-	       (if-let1 r (ref entry 'gid) 
-			#`",,gid=,r"
-			""))))
+  (apply 
+   string-append
+   (let1 r (list (if-let1 r (ref entry 'uid) 
+			  #`",,uid=,r"
+			  "")
+		 (if-let1 r (ref entry 'gid) 
+			  #`",,gid=,r"
+			  "")
+		 (if-let1 r (format "0~o"
+				    (mode-symbols->numbers (ref entry 'mode)))
+			  #`",,mode=,r"
+			  "")
+		 )
+	 r)))
+
+(define-method emit-attrs ((entry <dir-info>))
+  (let1 base (next-method)
+	#`",base,,create=,(ref entry 'create-as)"))
 
 (define-method prepare ((entry <regular-info>))
   (let1 dir-flag (if (file-is-directory? (ref entry 'from))
@@ -106,22 +179,24 @@
 				    (unless (file-exists? from)
 				      (error "No such file: " from))
 				    (let-keywords rest ((mode "u+w,a+rx")
-							(uid #f)
-							(gid #f))
+							(uid "root")
+							(gid "root"))
 				      (loop (read)
 					    name
 					    version
 					    (cons (make <regular-info>
 						    :from from 
 						    :to to
-						    :mode mode)
+						    :mode mode
+						    :uid uid
+						    :gid gid)
 						  entries)
 					    requires
 					    dummy-count))))
 	  ('ypack-dir (match-let1 (to . rest) (cdr exp)
-				  (let-keywords rest ((mode "u+w,a+rx")
-						      (uid #f)
-						      (gid #f))
+				  (let-keywords rest ((mode "u+rxw,go+rx")
+						      (uid "root")
+						      (gid "root"))
 						(loop (read)
 						      name
 						      version
@@ -140,14 +215,17 @@
 			       version
 			       (cons (make <link-info>
 				       :from from 
-				       :to to)
+				       :to to
+				       :mode "a+rwx"
+				       :uid "root"
+				       :gid "root")
 				     entries)
 			       requires
 			       dummy-count)))
 	  ('ypack-dummy (match-let1 (to . rest) (cdr exp)
 			  (let-keywords rest ((mode "u+w,a+rx")
-					      (uid #f)
-					      (gid #f))
+					      (uid "root")
+					      (gid "root"))
 			    (loop (read)
 				  name
 				  version
@@ -197,7 +275,6 @@
 
   (print #`",(symbol->string target) --verbose --name ,|name|	\\")
   (print #`"	--destdir=$(pwd)/build \\")
-  (print "	--ignore-owner \\")
   (print #`"	--pversion=,|version|.${uv} \\")
   
   (case target
