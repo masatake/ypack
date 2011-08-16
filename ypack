@@ -170,11 +170,15 @@
 	     (version "0.0.0")
 	     (entries (list))
 	     (requires (list))
-	     (dummy-count 0))
+	     (dummy-count 0)
+	     (license #f)
+	     (url #f))
     (if (eof-object? exp)
 	(values version name (reverse entries) requires)
 	(case (car exp)
-	  ('ypack-version (loop (read) name (cadr exp) entries requires dummy-count))
+	  ('ypack-version (loop (read) name (cadr exp) entries requires dummy-count license url))
+	  ('ypack-license (loop (read) name (cadr exp) entries requires dummy-count (cadr exp)) url)
+	  ('ypack-url (loop (read) name (cadr exp) entries requires dummy-count license (cadr exp)))
 	  ('ypack-entry (match-let1 (from to . rest) (cdr exp)
 				    (unless (file-exists? from)
 				      (error "No such file: " from))
@@ -192,7 +196,9 @@
 						    :gid gid)
 						  entries)
 					    requires
-					    dummy-count))))
+					    dummy-count
+					    license
+					    url))))
 	  ('ypack-dir (match-let1 (to . rest) (cdr exp)
 				  (let-keywords rest ((mode "u+rxw,go+rx")
 						      (uid "root")
@@ -208,7 +214,9 @@
 							      :gid gid)
 							    entries)
 						      requires
-						      dummy-count))))
+						      dummy-count
+						      license
+						      url))))
 	  ('ypack-link (match-let1 (from to . rest) (cdr exp)
 			 (loop (read)
 			       name
@@ -221,7 +229,9 @@
 				       :gid "root")
 				     entries)
 			       requires
-			       dummy-count)))
+			       dummy-count
+			       license
+			       url)))
 	  ('ypack-dummy (match-let1 (to . rest) (cdr exp)
 			  (let-keywords rest ((mode "u+w,a+rx")
 					      (uid "root")
@@ -238,19 +248,25 @@
 					  :gid gid)
 					entries)
 				  requires
-				  (+ dummy-count 1)))))
+				  (+ dummy-count 1)
+				  license
+				  url))))
 	  ('ypack-name (loop (read)
 			     (cadr exp)
 			     version
 			     entries
 			     requires
-			     dummy-count))
+			     dummy-count
+			     license
+			     url))
 	  ('ypack-require (loop (read) 
 				name
 				version
 				entries
 				(cons (cadr exp) requires)
-				dummy-count))
+				dummy-count
+				license
+				url))
 	  (else
 	   (error "Unknown directive: " (car exp)))))))
 
@@ -274,6 +290,8 @@
   (for-each prepare entries)
 
   (print #`",(symbol->string target) --verbose --name ,|name|	\\")
+  (when license
+	(print #`"	--license=,|license \\"))
   (print #`"	--destdir=$(pwd)/build \\")
   (print #`"	--pversion=,|version|.${uv} \\")
   
@@ -284,8 +302,6 @@
   (print " - <<EOF")
   (for-each emit-file-list-entry entries)
   (print "EOF"))
-
-
 
 (define (print-help status)
   (format #t "Usage: \n")
