@@ -174,11 +174,11 @@
 	     (license #f)
 	     (url #f))
     (if (eof-object? exp)
-	(values version name (reverse entries) requires)
+	(values version name (reverse entries) requires license url)
 	(case (car exp)
 	  ('ypack-version (loop (read) name (cadr exp) entries requires dummy-count license url))
-	  ('ypack-license (loop (read) name (cadr exp) entries requires dummy-count (cadr exp)) url)
-	  ('ypack-url (loop (read) name (cadr exp) entries requires dummy-count license (cadr exp)))
+	  ('ypack-license (loop (read) name version entries requires dummy-count (cadr exp) url))
+	  ('ypack-url     (loop (read) name version entries requires dummy-count license (cadr exp)))
 	  ('ypack-entry (match-let1 (from to . rest) (cdr exp)
 				    (unless (file-exists? from)
 				      (error "No such file: " from))
@@ -270,7 +270,7 @@
 	  (else
 	   (error "Unknown directive: " (car exp)))))))
 
-(define (emit target version name entries requires)
+(define (emit target version name entries requires license url)
   (define (emit-xpack-relations)
     (unless (null? requires)
       (let1 requires (apply string-append (intersperse "," requires))
@@ -291,7 +291,9 @@
 
   (print #`",(symbol->string target) --verbose --name ,|name|	\\")
   (when license
-	(print #`"	--license=,|license \\"))
+	(print #`"	--license=,|license| \\"))
+  (when url
+	(print #`"	--url=,|url| \\"))
   (print #`"	--destdir=$(pwd)/build \\")
   (print #`"	--pversion=,|version|.${uv} \\")
   
