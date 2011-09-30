@@ -133,9 +133,9 @@
 		 )
 	 r)))
 
-(define-method emit-attrs ((entry <dir-info>))
-  (let1 base (next-method)
-	#`",base,,create=,(ref entry 'create-as)"))
+;(define-method emit-attrs ((entry <dir-info>))
+;  (let1 base (next-method)
+;	#`",base,,create=,(ref entry 'create-as)"))
 
 (define-method prepare ((entry <regular-info>))
   (let1 dir-flag (if (file-is-directory? (ref entry 'from))
