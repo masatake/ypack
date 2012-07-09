@@ -28,6 +28,7 @@
 ;;  (ypack-version "...")
 ;;  (ypack-require "...")...
 ;;  (ypack-entry FROM TO MODE ...)...
+;;  (ypack-entry0 TO MODE ...)
 ;;  (ypack-link  FROM TO)
 ;;  (ypack-dir   TO)
 ;;  (ypack-dummy TO)
@@ -183,6 +184,8 @@
 	  ('ypack-version (loop (read) name (cadr exp) entries requires dummy-count license url))
 	  ('ypack-license (loop (read) name version entries requires dummy-count (cadr exp) url))
 	  ('ypack-url     (loop (read) name version entries requires dummy-count license (cadr exp)))
+	  ('ypack-entry*  (loop `(ypack-entry ,(sys-basename (cadr exp)) . ,(cdr exp))
+				name version entries requires dummy-count license url))
 	  ('ypack-entry (match-let1 (from to . rest) (cdr exp)
 				    (unless (file-exists? from)
 				      (error "No such file: " from))
