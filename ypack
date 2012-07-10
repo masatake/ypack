@@ -21,17 +21,17 @@
 ;; 
 ;;  Author: Masatake YAMATO <yamato@redhat.com>
 ;;
-;; INPUT: 
-;;
-;;  (ypack-name "...")
-;;  (ypack-version "...")
-;;  (ypack-require "...")...
-;;  (ypack-entry FROM TO MODE ...)...
-;;  (ypack-entry0 TO MODE ...)
-;;  (ypack-link  FROM TO)
-;;  (ypack-dir   TO)
-;;  (ypack-dummy TO)
-;;
+(define expected-input "
+ (ypack-name \"...\")
+ (ypack-version \"...\")
+ (ypack-require \"...\")...
+ (ypack-entry FROM TO MODE ...)...
+ (ypack-entry TO MODE ...)
+ (ypack-link  FROM TO)
+ (ypack-dir   TO)
+ (ypack-dummy TO)
+")
+
 (use srfi-1)
 (use util.match)
 (use file.util)
@@ -318,6 +318,9 @@
   (format #t "Usage: \n")
   (format #t "	~a --xpack  < _.ypk\n" *program-name*)
   (format #t "	~a --pmaker < _.ypk\n" *program-name*)
+  (newline)
+  (format #t "Input format: \n")
+  (print expected-input)
   (exit status))
 
 (define (main args)
