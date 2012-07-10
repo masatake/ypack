@@ -158,14 +158,17 @@
     (print #`"echo ,(ref entry 'dummy-count) > build,|to|")
     (print #`"chmod ,(ref entry 'mode) build,|to|")))
 
+(define (esc-with-backslash str)
+  (regexp-replace-all #/,/ str "\\\\,"))
+
 (define-method emit-file-list-entry ((entry <regular-info>))
-  (print #`"$(pwd)/build,(ref entry 'to),(emit-attrs entry)"))
+  (print #`"$(pwd)/build,(esc-with-backslash (ref entry 'to)),(emit-attrs entry)"))
 (define-method emit-file-list-entry ((entry <dir-info>))
-  (print #`"$(pwd)/build,(ref entry 'to),(emit-attrs entry)"))
+  (print #`"$(pwd)/build,(esc-with-backslash (ref entry 'to)),(emit-attrs entry)"))
 (define-method emit-file-list-entry ((entry <link-info>))
-  (print #`"$(pwd)/build,(ref entry 'from),(emit-attrs entry)"))
+  (print #`"$(pwd)/build,(esc-with-backslash (ref entry 'from)),(emit-attrs entry)"))
 (define-method emit-file-list-entry ((entry <dummy-info>))
-  (print #`"$(pwd)/build,(ref entry 'to),(emit-attrs entry)"))
+  (print #`"$(pwd)/build,(esc-with-backslash (ref entry 'to)),(emit-attrs entry)"))
 
 
 (define (gather)
