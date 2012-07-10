@@ -21,7 +21,6 @@
 ;; 
 ;;  Author: Masatake YAMATO <yamato@redhat.com>
 ;;
-
 ;; INPUT: 
 ;;
 ;;  (ypack-name "...")
@@ -184,28 +183,31 @@
 	  ('ypack-version (loop (read) name (cadr exp) entries requires dummy-count license url))
 	  ('ypack-license (loop (read) name version entries requires dummy-count (cadr exp) url))
 	  ('ypack-url     (loop (read) name version entries requires dummy-count license (cadr exp)))
-	  ('ypack-entry*  (loop `(ypack-entry ,(sys-basename (cadr exp)) . ,(cdr exp))
-				name version entries requires dummy-count license url))
-	  ('ypack-entry (match-let1 (from to . rest) (cdr exp)
-				    (unless (file-exists? from)
-				      (error "No such file: " from))
-				    (let-keywords rest ((mode "u+w,a+rx")
-							(uid "root")
-							(gid "root"))
-				      (loop (read)
-					    name
-					    version
-					    (cons (make <regular-info>
-						    :from from 
-						    :to to
-						    :mode mode
-						    :uid uid
-						    :gid gid)
-						  entries)
-					    requires
-					    dummy-count
-					    license
-					    url))))
+	  ('ypack-entry (match-let1 (target . rest) (cdr exp)
+				    (let* ((full-notation? (and (pair? rest)
+								(string? (car rest))))
+					   (from (if full-notation? target (sys-basename target)))
+					   (to (if full-notation? (car rest) target))
+					   (rest (if full-notation? (cdr rest) rest)))
+				      (unless (file-exists? from)
+					(error "No such file: " from))
+				      (let-keywords rest ((mode "u+w,a+rx")
+							  (uid "root")
+							  (gid "root"))
+					(loop (read)
+					      name
+					      version
+					      (cons (make <regular-info>
+						      :from from 
+						      :to to
+						      :mode mode
+						      :uid uid
+						      :gid gid)
+						    entries)
+					      requires
+					      dummy-count
+					      license
+					      url)))))
 	  ('ypack-dir (match-let1 (to . rest) (cdr exp)
 				  (let-keywords rest ((mode "u+rxw,go+rx")
 						      (uid "root")

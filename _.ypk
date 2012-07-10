@@ -3,5 +3,5 @@
 (ypack-name "ypack")
 (ypack-url  "https://github.com/masatake/ypack")
 (ypack-license "GPLv3+")
-(ypack-entry* "/usr/bin/ypack")
+(ypack-entry "/usr/bin/ypack")
 
