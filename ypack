@@ -313,7 +313,7 @@
     ('xpack (emit-xpack-relations))
     ('pmaker (emit-pmaker-relations)))
 
-  (print "\"$@\ \\")
+  (print "\"$@\" \\")
   (print "- <<EOF")
   (for-each emit-file-list-entry entries)
   (print "EOF"))
