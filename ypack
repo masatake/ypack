@@ -303,7 +303,7 @@
 
   (print #`",(symbol->string target) --verbose --name ,|name|	\\")
   (when license
-	(print #`"	--license=,|license| \\"))
+	(print #`"	--license=\",|license|\" \\"))
   (when url
 	(print #`"	--url=,|url| \\"))
   (print #`"	--destdir=$(pwd)/build \\")
