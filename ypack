@@ -296,7 +296,12 @@
 
   ;;
   (print "#!/bin/bash -x")
-  (print "uv=${1:-0}")
+  (print "uv=0")
+  (print "shopt -s extglob")
+  (print "if [[ $# -gt 0 && \"${1}\" == +([0-9]) ]]; then")
+  (print "	uv=${1}")
+  (print "	shift 1")
+  (print "fi")
   (newline)
   (print "rm -rf workdir build")
   (for-each prepare entries)
