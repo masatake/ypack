@@ -44,6 +44,7 @@
    (mode :init-keyword :mode)
    (uid :init-keyword :uid)
    (gid :init-keyword :gid)
+   (config :init-keyword :config :init-value #f)
    (create-as)
    ))
 
@@ -130,6 +131,11 @@
 				    (mode-symbols->numbers (ref entry 'mode)))
 			  #`",,mode=,r"
 			  "")
+		 (let1 r (ref entry 'config)
+		   (cond
+		    ((symbol? r) #`",,rpm_attr=%config(,r)")
+		    (r ",rpm_attr=%config")
+		    (else "")))
 		 )
 	 r)))
 
@@ -179,13 +185,15 @@
 	     (requires (list))
 	     (dummy-count 0)
 	     (license #f)
-	     (url #f))
+	     (url #f)
+	     (group #f))
     (if (eof-object? exp)
-	(values version name (reverse entries) requires license url)
+	(values version name (reverse entries) requires license url group)
 	(case (car exp)
-	  ('ypack-version (loop (read) name (cadr exp) entries requires dummy-count license url))
-	  ('ypack-license (loop (read) name version entries requires dummy-count (cadr exp) url))
-	  ('ypack-url     (loop (read) name version entries requires dummy-count license (cadr exp)))
+	  ('ypack-version (loop (read) name (cadr exp) entries requires dummy-count license url group))
+	  ('ypack-license (loop (read) name version entries requires dummy-count (cadr exp) url group))
+	  ('ypack-url     (loop (read) name version entries requires dummy-count license (cadr exp) group))
+	  ('ypack-group   (loop (read) name version entries requires dummy-count license url (cadr exp)))
 	  ('ypack-entry (match-let1 (target . rest) (cdr exp)
 				    (let* ((full-notation? (and (pair? rest)
 								(string? (car rest))))
@@ -196,7 +204,8 @@
 					(error "No such file: " from))
 				      (let-keywords rest ((mode "u+w,a+rx")
 							  (uid "root")
-							  (gid "root"))
+							  (gid "root")
+							  (config #f))
 					(loop (read)
 					      name
 					      version
@@ -205,12 +214,14 @@
 						      :to to
 						      :mode mode
 						      :uid uid
-						      :gid gid)
+						      :gid gid
+						      :config config)
 						    entries)
 					      requires
 					      dummy-count
 					      license
-					      url)))))
+					      url
+					      group)))))
 	  ('ypack-dir (match-let1 (to . rest) (cdr exp)
 				  (let-keywords rest ((mode "u+rxw,go+rx")
 						      (uid "root")
@@ -228,7 +239,8 @@
 						      requires
 						      dummy-count
 						      license
-						      url))))
+						      url
+						      group))))
 	  ('ypack-link (match-let1 (from to . rest) (cdr exp)
 			 (loop (read)
 			       name
@@ -238,16 +250,19 @@
 				       :to to
 				       :mode "a+rwx"
 				       :uid "root"
-				       :gid "root")
+				       :gid "root"
+				       :config #f)
 				     entries)
 			       requires
 			       dummy-count
 			       license
-			       url)))
+			       url
+			       group)))
 	  ('ypack-dummy (match-let1 (to . rest) (cdr exp)
 			  (let-keywords rest ((mode "u+w,a+rx")
 					      (uid "root")
-					      (gid "root"))
+					      (gid "root")
+					      (config #f))
 			    (loop (read)
 				  name
 				  version
@@ -257,12 +272,14 @@
 					  :mode mode
 					  :dummy-count dummy-count
 					  :uid uid
-					  :gid gid)
+					  :gid gid
+					  :config config)
 					entries)
 				  requires
 				  (+ dummy-count 1)
 				  license
-				  url))))
+				  url
+				  group))))
 	  ('ypack-name (loop (read)
 			     (cadr exp)
 			     version
@@ -270,7 +287,8 @@
 			     requires
 			     dummy-count
 			     license
-			     url))
+			     url
+			     group))
 	  ('ypack-require (loop (read) 
 				name
 				version
@@ -278,11 +296,12 @@
 				(cons (cadr exp) requires)
 				dummy-count
 				license
-				url))
+				url
+				group))
 	  (else
 	   (error "Unknown directive: " (car exp)))))))
 
-(define (emit target version name entries requires license url)
+(define (emit target version name entries requires license url group)
   (define (emit-xpack-relations)
     (unless (null? requires)
       (let1 requires (apply string-append (intersperse "," requires))
@@ -311,6 +330,8 @@
 	(print #`"	--license=\",|license|\" \\"))
   (when url
 	(print #`"	--url=,|url| \\"))
+  (when group
+	(print #`"	--group=\",|group|\" \\"))
   (print #`"	--destdir=$(pwd)/build \\")
   (print #`"	--pversion=,|version|.${uv} \\")
   
