@@ -51,6 +51,7 @@
 (define-class <regular-info> (<entry-info>)
   (
    (create-as :init-value "file")
+   (ghost :init-value #f :init-keyword :ghost)
    ))
 (define-class <dir-info> (<entry-info>)
   (
@@ -131,11 +132,16 @@
 				    (mode-symbols->numbers (ref entry 'mode)))
 			  #`",,mode=,r"
 			  "")
+		 ",rpm_attr="
 		 (let1 r (ref entry 'config)
 		   (cond
-		    ((symbol? r) #`",,rpm_attr=%config(,r)")
-		    (r ",rpm_attr=%config")
+		    ((symbol? r) #`"%config(,r) ")
+		    (r "%config ")
 		    (else "")))
+		 (if (ref entry 'ghost)
+		     "%ghost "
+		     "")
+		 " /"
 		 )
 	 r)))
 
@@ -205,7 +211,8 @@
 				      (let-keywords rest ((mode "u+w,a+rx")
 							  (uid "root")
 							  (gid "root")
-							  (config #f))
+							  (config #f)
+							  (ghost #f))
 					(loop (read)
 					      name
 					      version
@@ -215,7 +222,8 @@
 						      :mode mode
 						      :uid uid
 						      :gid gid
-						      :config config)
+						      :config config
+						      :ghost ghost)
 						    entries)
 					      requires
 					      dummy-count
