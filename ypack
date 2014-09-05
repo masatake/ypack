@@ -45,13 +45,13 @@
    (uid :init-keyword :uid)
    (gid :init-keyword :gid)
    (config :init-keyword :config :init-value #f)
+   (ghost :init-value #f :init-keyword :ghost)
    (create-as)
    ))
 
 (define-class <regular-info> (<entry-info>)
   (
    (create-as :init-value "file")
-   (ghost :init-value #f :init-keyword :ghost)
    ))
 (define-class <dir-info> (<entry-info>)
   (
@@ -270,7 +270,8 @@
 			  (let-keywords rest ((mode "u+w,a+rx")
 					      (uid "root")
 					      (gid "root")
-					      (config #f))
+					      (config #f)
+					      (ghost #f))
 			    (loop (read)
 				  name
 				  version
@@ -281,7 +282,8 @@
 					  :dummy-count dummy-count
 					  :uid uid
 					  :gid gid
-					  :config config)
+					  :config config
+					  :ghost ghost)
 					entries)
 				  requires
 				  (+ dummy-count 1)
