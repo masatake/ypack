@@ -172,8 +172,10 @@
   #t)
 (define-method prepare ((entry <dummy-info>))
   (let1 to (ref entry 'to)
-    (print #`"echo ,(ref entry 'dummy-count) > build,|to|")
-    (print #`"chmod ,(ref entry 'mode) build,|to|")))
+    (let1 dir (sys-dirname to)
+      (print #`"mkdir -p build,|dir|")
+      (print #`"echo ,(ref entry 'dummy-count) > build,|to|")
+      (print #`"chmod ,(ref entry 'mode) build,|to|"))))
 
 (define (esc-with-backslash str)
   (regexp-replace-all #/,/ str "\\\\,"))
