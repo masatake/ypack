@@ -120,30 +120,35 @@
 		    (error "Failed in parse mode string")))))
 
 (define-method emit-attrs ((entry <entry-info>))
-  (apply 
+  (apply
    string-append
-   (let1 r (list (if-let1 r (ref entry 'uid) 
-			  #`",,uid=,r"
-			  "")
-		 (if-let1 r (ref entry 'gid) 
-			  #`",,gid=,r"
-			  "")
-		 (if-let1 r (format "0~o"
-				    (mode-symbols->numbers (ref entry 'mode)))
-			  #`",,mode=,r"
-			  "")
-		 ",rpm_attr="
-		 (let1 r (ref entry 'config)
-		   (cond
-		    ((symbol? r) #`"%config(,r) ")
-		    (r "%config ")
-		    (else "")))
-		 (if (ref entry 'ghost)
-		     "%ghost "
-		     "")
-		 " /"
-		 )
-	 r)))
+   (list (if-let1 r (ref entry 'uid)
+	   #`",,uid=,r"
+	   "")
+	 (if-let1 r (ref entry 'gid)
+	   #`",,gid=,r"
+	   "")
+	 (if-let1 r (format "0~o"
+			    (mode-symbols->numbers (ref entry 'mode)))
+	   #`",,mode=,r"
+	   "")
+	 (if (or (ref entry 'ghost)
+		 (ref entry 'config))
+	     ",rpm_attr="
+	     "")
+	 (if (ref entry 'ghost)
+	     "%ghost "
+	     "")
+	 (let1 r (ref entry 'config)
+	   (cond
+	    ((symbol? r) #`"%config(,r) ")
+	    (r "%config ")
+	    (else "")))
+	 (if (or (ref entry 'ghost)
+		 (ref entry 'config))
+	     "/"
+	     ""
+	     ))))
 
 (define-method emit-attrs ((entry <link-info>))
   #`",(next-method),,create=1,,linkto=,(ref entry 'to)")
