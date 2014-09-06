@@ -1,4 +1,4 @@
-(ypack-version "0.0.16")
+(ypack-version "0.0.17")
 (ypack-require "gauche")
 (ypack-name "ypack")
 (ypack-url  "https://github.com/masatake/ypack")
